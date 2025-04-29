@@ -10,14 +10,6 @@ mod erc1155 {
     use ink::prelude::vec::Vec;
     use scale::{Decode, Encode};
 
-    // Add new imports for lifecycle management
-    use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-    use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
-    use near_sdk::json_types::{U128, U64};
-    use near_sdk::serde::{Deserialize, Serialize};
-    use near_sdk::{env, near_bindgen, AccountId, Balance, Promise, PromiseResult};
-    use std::collections::HashMap;
-
     /// Defines the storage of your contract.
     /// All the fields will be stored on-chain.
     #[derive(SpreadAllocate)]
@@ -31,6 +23,7 @@ mod erc1155 {
         token_id_nonce: Id,
         /// Maps token ID to token URI.
         token_uris: Mapping<Id, String>,
+        /// Lifecycle state
         lifecycle_state: LifecycleState,
     }
 
@@ -50,6 +43,12 @@ mod erc1155 {
         NotOwner,
         /// Transfer array size mismatch.
         ArraySizeMismatch,
+        /// Contract is paused
+        ContractPaused,
+        /// Account is blacklisted
+        AccountBlacklisted,
+        /// Account is not whitelisted
+        AccountNotWhitelisted,
     }
 
     /// Event emitted when tokens are transferred.
@@ -85,28 +84,103 @@ mod erc1155 {
         uri: String,
     }
 
-    // Add new types for lifecycle management
-    #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
-    #[serde(crate = "near_sdk::serde")]
-    pub struct Role {
-        pub name: String,
-        pub members: UnorderedSet<AccountId>,
+    /// Event emitted when contract is paused.
+    #[ink(event)]
+    pub struct Paused {
+        #[ink(topic)]
+        account: AccountId,
     }
 
-    #[derive(BorshSerialize, BorshDeserialize)]
+    /// Event emitted when contract is unpaused.
+    #[ink(event)]
+    pub struct Unpaused {
+        #[ink(topic)]
+        account: AccountId,
+    }
+
+    /// Event emitted when an account is blacklisted.
+    #[ink(event)]
+    pub struct Blacklisted {
+        #[ink(topic)]
+        account: AccountId,
+    }
+
+    /// Event emitted when an account is removed from blacklist.
+    #[ink(event)]
+    pub struct Unblacklisted {
+        #[ink(topic)]
+        account: AccountId,
+    }
+
+    /// Event emitted when an account is whitelisted.
+    #[ink(event)]
+    pub struct Whitelisted {
+        #[ink(topic)]
+        account: AccountId,
+    }
+
+    /// Event emitted when an account is removed from whitelist.
+    #[ink(event)]
+    pub struct Unwhitelisted {
+        #[ink(topic)]
+        account: AccountId,
+    }
+
+    /// Event emitted when burn address is updated.
+    #[ink(event)]
+    pub struct BurnAddressUpdated {
+        #[ink(topic)]
+        old_address: Option<AccountId>,
+        #[ink(topic)]
+        new_address: AccountId,
+    }
+
+    /// Event emitted when a role is created.
+    #[ink(event)]
+    pub struct RoleCreated {
+        #[ink(topic)]
+        role_name: String,
+    }
+
+    /// Event emitted when an account is added to a role.
+    #[ink(event)]
+    pub struct RoleAdded {
+        #[ink(topic)]
+        role_name: String,
+        #[ink(topic)]
+        account: AccountId,
+    }
+
+    /// Event emitted when an account is removed from a role.
+    #[ink(event)]
+    pub struct RoleRemoved {
+        #[ink(topic)]
+        role_name: String,
+        #[ink(topic)]
+        account: AccountId,
+    }
+
+    #[derive(Encode, Decode, Debug, Clone)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct Role {
+        pub name: String,
+        pub members: Vec<AccountId>,
+    }
+
+    #[derive(Encode, Decode, Debug, Clone)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct LifecycleState {
         pub paused: bool,
-        pub blacklist: UnorderedSet<AccountId>,
-        pub whitelist: UnorderedSet<AccountId>,
+        pub blacklist: Vec<AccountId>,
+        pub whitelist: Vec<AccountId>,
         pub burn_address: Option<AccountId>,
-        pub roles: UnorderedMap<String, Role>,
+        pub roles: Vec<Role>,
     }
 
     impl Erc1155 {
         /// Creates a new ERC1155 contract.
         #[ink(constructor)]
         pub fn new() -> Self {
-            // Initialize the contract storage using the `SpreadAllocate` trait.
             ink::utils::initialize_contract(|_| {})
         }
 
@@ -174,14 +248,14 @@ mod erc1155 {
             amount: Balance,
             data: Vec<u8>,
         ) -> Result<(), Error> {
-            self.assert_not_paused();
-            self.assert_not_blacklisted(from);
-            self.assert_not_blacklisted(to);
-            self.assert_not_blacklisted(env::predecessor_account_id());
+            self.assert_not_paused()?;
+            self.assert_not_blacklisted(from)?;
+            self.assert_not_blacklisted(to)?;
+            self.assert_not_blacklisted(self.env().caller())?;
 
             if let Some(burn_address) = &self.lifecycle_state.burn_address {
                 if to == *burn_address {
-                    self.assert_whitelisted(from);
+                    self.assert_whitelisted(from)?;
                     return self.burn(from, id, amount);
                 }
             }
@@ -350,115 +424,191 @@ mod erc1155 {
             Ok(())
         }
 
-        // Add new lifecycle management methods
-        pub fn pause(&mut self) {
-            self.assert_owner();
+        /// Pauses all token transfers.
+        #[ink(message)]
+        pub fn pause(&mut self) -> Result<(), Error> {
+            self.assert_owner()?;
             self.lifecycle_state.paused = true;
+            self.env().emit_event(Paused {
+                account: self.env().caller(),
+            });
+            Ok(())
         }
 
-        pub fn unpause(&mut self) {
-            self.assert_owner();
+        /// Unpauses all token transfers.
+        #[ink(message)]
+        pub fn unpause(&mut self) -> Result<(), Error> {
+            self.assert_owner()?;
             self.lifecycle_state.paused = false;
+            self.env().emit_event(Unpaused {
+                account: self.env().caller(),
+            });
+            Ok(())
         }
 
+        /// Returns whether the contract is paused.
+        #[ink(message)]
         pub fn is_paused(&self) -> bool {
             self.lifecycle_state.paused
         }
 
-        pub fn add_to_blacklist(&mut self, account_id: AccountId) {
-            self.assert_owner();
-            self.lifecycle_state.blacklist.insert(&account_id);
+        /// Adds an account to the blacklist.
+        #[ink(message)]
+        pub fn add_to_blacklist(&mut self, account: AccountId) -> Result<(), Error> {
+            self.assert_owner()?;
+            if !self.lifecycle_state.blacklist.contains(&account) {
+                self.lifecycle_state.blacklist.push(account);
+                self.env().emit_event(Blacklisted { account });
+            }
+            Ok(())
         }
 
-        pub fn remove_from_blacklist(&mut self, account_id: AccountId) {
-            self.assert_owner();
-            self.lifecycle_state.blacklist.remove(&account_id);
+        /// Removes an account from the blacklist.
+        #[ink(message)]
+        pub fn remove_from_blacklist(&mut self, account: AccountId) -> Result<(), Error> {
+            self.assert_owner()?;
+            if let Some(pos) = self.lifecycle_state.blacklist.iter().position(|x| *x == account) {
+                self.lifecycle_state.blacklist.remove(pos);
+                self.env().emit_event(Unblacklisted { account });
+            }
+            Ok(())
         }
 
-        pub fn is_blacklisted(&self, account_id: AccountId) -> bool {
-            self.lifecycle_state.blacklist.contains(&account_id)
+        /// Returns whether an account is blacklisted.
+        #[ink(message)]
+        pub fn is_blacklisted(&self, account: AccountId) -> bool {
+            self.lifecycle_state.blacklist.contains(&account)
         }
 
-        pub fn add_to_whitelist(&mut self, account_id: AccountId) {
-            self.assert_owner();
-            self.lifecycle_state.whitelist.insert(&account_id);
+        /// Adds an account to the whitelist.
+        #[ink(message)]
+        pub fn add_to_whitelist(&mut self, account: AccountId) -> Result<(), Error> {
+            self.assert_owner()?;
+            if !self.lifecycle_state.whitelist.contains(&account) {
+                self.lifecycle_state.whitelist.push(account);
+                self.env().emit_event(Whitelisted { account });
+            }
+            Ok(())
         }
 
-        pub fn remove_from_whitelist(&mut self, account_id: AccountId) {
-            self.assert_owner();
-            self.lifecycle_state.whitelist.remove(&account_id);
+        /// Removes an account from the whitelist.
+        #[ink(message)]
+        pub fn remove_from_whitelist(&mut self, account: AccountId) -> Result<(), Error> {
+            self.assert_owner()?;
+            if let Some(pos) = self.lifecycle_state.whitelist.iter().position(|x| *x == account) {
+                self.lifecycle_state.whitelist.remove(pos);
+                self.env().emit_event(Unwhitelisted { account });
+            }
+            Ok(())
         }
 
-        pub fn is_whitelisted(&self, account_id: AccountId) -> bool {
-            self.lifecycle_state.whitelist.contains(&account_id)
+        /// Returns whether an account is whitelisted.
+        #[ink(message)]
+        pub fn is_whitelisted(&self, account: AccountId) -> bool {
+            self.lifecycle_state.whitelist.contains(&account)
         }
 
-        pub fn set_burn_address(&mut self, account_id: AccountId) {
-            self.assert_owner();
-            self.lifecycle_state.burn_address = Some(account_id);
+        /// Sets the burn address.
+        #[ink(message)]
+        pub fn set_burn_address(&mut self, account: AccountId) -> Result<(), Error> {
+            self.assert_owner()?;
+            let old_address = self.lifecycle_state.burn_address;
+            self.lifecycle_state.burn_address = Some(account);
+            self.env().emit_event(BurnAddressUpdated {
+                old_address,
+                new_address: account,
+            });
+            Ok(())
         }
 
+        /// Returns the burn address.
+        #[ink(message)]
         pub fn get_burn_address(&self) -> Option<AccountId> {
-            self.lifecycle_state.burn_address.clone()
+            self.lifecycle_state.burn_address
         }
 
-        // Add role management methods
-        pub fn create_role(&mut self, role_name: String) {
-            self.assert_owner();
+        /// Creates a new role.
+        #[ink(message)]
+        pub fn create_role(&mut self, role_name: String) -> Result<(), Error> {
+            self.assert_owner()?;
             let role = Role {
                 name: role_name.clone(),
-                members: UnorderedSet::new(role_name.as_bytes()),
+                members: Vec::new(),
             };
-            self.lifecycle_state.roles.insert(&role_name, &role);
+            self.lifecycle_state.roles.push(role);
+            self.env().emit_event(RoleCreated { role_name });
+            Ok(())
         }
 
-        pub fn add_to_role(&mut self, role_name: String, account_id: AccountId) {
-            self.assert_owner();
-            let mut role = self.lifecycle_state.roles.get(&role_name).expect("Role not found");
-            role.members.insert(&account_id);
-            self.lifecycle_state.roles.insert(&role_name, &role);
+        /// Adds an account to a role.
+        #[ink(message)]
+        pub fn add_to_role(&mut self, role_name: String, account: AccountId) -> Result<(), Error> {
+            self.assert_owner()?;
+            if let Some(role) = self.lifecycle_state.roles.iter_mut().find(|r| r.name == role_name) {
+                if !role.members.contains(&account) {
+                    role.members.push(account);
+                    self.env().emit_event(RoleAdded {
+                        role_name,
+                        account,
+                    });
+                }
+            }
+            Ok(())
         }
 
-        pub fn remove_from_role(&mut self, role_name: String, account_id: AccountId) {
-            self.assert_owner();
-            let mut role = self.lifecycle_state.roles.get(&role_name).expect("Role not found");
-            role.members.remove(&account_id);
-            self.lifecycle_state.roles.insert(&role_name, &role);
+        /// Removes an account from a role.
+        #[ink(message)]
+        pub fn remove_from_role(&mut self, role_name: String, account: AccountId) -> Result<(), Error> {
+            self.assert_owner()?;
+            if let Some(role) = self.lifecycle_state.roles.iter_mut().find(|r| r.name == role_name) {
+                if let Some(pos) = role.members.iter().position(|x| *x == account) {
+                    role.members.remove(pos);
+                    self.env().emit_event(RoleRemoved {
+                        role_name,
+                        account,
+                    });
+                }
+            }
+            Ok(())
         }
 
-        pub fn has_role(&self, role_name: String, account_id: AccountId) -> bool {
-            if let Some(role) = self.lifecycle_state.roles.get(&role_name) {
-                role.members.contains(&account_id)
+        /// Returns whether an account has a role.
+        #[ink(message)]
+        pub fn has_role(&self, role_name: String, account: AccountId) -> bool {
+            if let Some(role) = self.lifecycle_state.roles.iter().find(|r| r.name == role_name) {
+                role.members.contains(&account)
             } else {
                 false
             }
         }
 
-        // Add helper methods for assertions
-        fn assert_not_paused(&self) {
-            assert!(!self.lifecycle_state.paused, "Contract is paused");
+        // Helper methods for assertions
+        fn assert_not_paused(&self) -> Result<(), Error> {
+            if self.lifecycle_state.paused {
+                return Err(Error::ContractPaused);
+            }
+            Ok(())
         }
 
-        fn assert_not_blacklisted(&self, account_id: AccountId) {
-            assert!(
-                !self.lifecycle_state.blacklist.contains(&account_id),
-                "Account is blacklisted"
-            );
+        fn assert_not_blacklisted(&self, account: AccountId) -> Result<(), Error> {
+            if self.lifecycle_state.blacklist.contains(&account) {
+                return Err(Error::AccountBlacklisted);
+            }
+            Ok(())
         }
 
-        fn assert_whitelisted(&self, account_id: AccountId) {
-            assert!(
-                self.lifecycle_state.whitelist.contains(&account_id),
-                "Account is not whitelisted"
-            );
+        fn assert_whitelisted(&self, account: AccountId) -> Result<(), Error> {
+            if !self.lifecycle_state.whitelist.contains(&account) {
+                return Err(Error::AccountNotWhitelisted);
+            }
+            Ok(())
         }
 
-        fn assert_owner(&self) {
-            assert_eq!(
-                env::predecessor_account_id(),
-                env::current_account_id(),
-                "Caller must be contract owner"
-            );
+        fn assert_owner(&self) -> Result<(), Error> {
+            if self.env().caller() != self.env().account_id() {
+                return Err(Error::NotOwner);
+            }
+            Ok(())
         }
     }
 

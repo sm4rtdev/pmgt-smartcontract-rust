@@ -9,23 +9,18 @@ subxt = { version = "0.25", features = ["substrate"] }
 subxt-signer = "0.25"
 sp-core = "7.0.0"
 sp-runtime = "7.0.0"
-codec = { package = "parity-scale-codec", version = "3.2.1", features = ["derive"] }
+codec = { package = "parity-scale-codec", version = "3.6.1", features = ["derive"] }
 scale = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = ["derive"] }
 scale-info = { version = "2.9.0", default-features = false, features = ["derive"], optional = true }
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.4.0", features = ["derive"] }
 ink = "4.0"
-tokio = { version = "1.24", features = ["full"] }
+tokio = { version = "1.32.0", features = ["full"] }
 hex = "0.4"
 frame-system = "4.0.0"
 frame-support = "4.0.0"
 getrandom = "0.2"
 # SLED database for local storage
 sled = "0.34.7"
-
-# Additional dependencies for implementation tools
-tokio = { version = "1.32.0", features = ["full"] }
-codec = { package = "parity-scale-codec", version = "3.6.1", features = ["derive"] }
-clap = { version = "4.4.0", features = ["derive"] }
 
 [dev-dependencies]
 mockall = "0.11.3"
