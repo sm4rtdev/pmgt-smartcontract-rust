@@ -1,0 +1,23 @@
+# Generated files
+/target/
+
+# Contract artifacts
+*.contract
+*.wasm
+
+# Runtime artifacts
+metadata.scale
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Backup files
+**/*.rs.bk
+
+# Mac OS files
+.DS_Store
+
+# Cargo lock file (can be tracked for applications, but often not for libraries)
+Cargo.lock 
