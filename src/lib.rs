@@ -126,15 +126,6 @@ mod erc1155 {
         account: AccountId,
     }
 
-    /// Event emitted when burn address is updated.
-    #[ink(event)]
-    pub struct BurnAddressUpdated {
-        #[ink(topic)]
-        old_address: Option<AccountId>,
-        #[ink(topic)]
-        new_address: AccountId,
-    }
-
     /// Event emitted when a role is created.
     #[ink(event)]
     pub struct RoleCreated {
@@ -173,7 +164,6 @@ mod erc1155 {
         pub paused: bool,
         pub blacklist: Vec<AccountId>,
         pub whitelist: Vec<AccountId>,
-        pub burn_address: Option<AccountId>,
         pub roles: Vec<Role>,
     }
 
@@ -252,13 +242,6 @@ mod erc1155 {
             self.assert_not_blacklisted(from)?;
             self.assert_not_blacklisted(to)?;
             self.assert_not_blacklisted(self.env().caller())?;
-
-            if let Some(burn_address) = &self.lifecycle_state.burn_address {
-                if to == *burn_address {
-                    self.assert_whitelisted(from)?;
-                    return self.burn(from, id, amount);
-                }
-            }
 
             self.transfer_from(from, to, id, amount, data)
         }
@@ -391,39 +374,6 @@ mod erc1155 {
             Ok(())
         }
 
-        /// Burn tokens.
-        #[ink(message)]
-        pub fn burn(
-            &mut self,
-            from: AccountId,
-            id: Id,
-            amount: Balance,
-        ) -> Result<(), Error> {
-            let caller = self.env().caller();
-            
-            if from != caller && !self.is_approved_for_all(from, caller) {
-                return Err(Error::NotApproved);
-            }
-            
-            let from_balance = self.balance_of(from, id);
-            
-            if from_balance < amount {
-                return Err(Error::InsufficientBalance);
-            }
-            
-            self.balances.insert((id, from), &(from_balance - amount));
-            
-            self.env().emit_event(TransferBatch {
-                operator: Some(caller),
-                from: Some(from),
-                to: None,
-                ids: vec![id],
-                values: vec![amount],
-            });
-            
-            Ok(())
-        }
-
         /// Pauses all token transfers.
         #[ink(message)]
         pub fn pause(&mut self) -> Result<(), Error> {
@@ -506,25 +456,6 @@ mod erc1155 {
         #[ink(message)]
         pub fn is_whitelisted(&self, account: AccountId) -> bool {
             self.lifecycle_state.whitelist.contains(&account)
-        }
-
-        /// Sets the burn address.
-        #[ink(message)]
-        pub fn set_burn_address(&mut self, account: AccountId) -> Result<(), Error> {
-            self.assert_owner()?;
-            let old_address = self.lifecycle_state.burn_address;
-            self.lifecycle_state.burn_address = Some(account);
-            self.env().emit_event(BurnAddressUpdated {
-                old_address,
-                new_address: account,
-            });
-            Ok(())
-        }
-
-        /// Returns the burn address.
-        #[ink(message)]
-        pub fn get_burn_address(&self) -> Option<AccountId> {
-            self.lifecycle_state.burn_address
         }
 
         /// Creates a new role.

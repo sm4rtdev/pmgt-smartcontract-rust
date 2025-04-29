@@ -12,7 +12,6 @@ pub struct LifecycleState {
     pub paused: bool,
     pub blacklist: Vec<AccountId>,
     pub whitelist: Vec<AccountId>,
-    pub burn_address: Option<AccountId>,
     pub roles: Vec<Role>,
 }
 ```
@@ -104,21 +103,6 @@ pub fn add_to_whitelist(&mut self, account: AccountId) -> Result<(), Error> {
 }
 ```
 
-### Burn Functionality
-```rust
-#[ink(message)]
-pub fn set_burn_address(&mut self, account: AccountId) -> Result<(), Error> {
-    self.assert_owner()?;
-    let old_address = self.lifecycle_state.burn_address;
-    self.lifecycle_state.burn_address = Some(account);
-    self.env().emit_event(BurnAddressUpdated {
-        old_address,
-        new_address: account,
-    });
-    Ok(())
-}
-```
-
 ## 4. Improved Transfer Logic
 
 ### Enhanced safe_transfer_from
@@ -136,13 +120,6 @@ pub fn safe_transfer_from(
     self.assert_not_blacklisted(from)?;
     self.assert_not_blacklisted(to)?;
     self.assert_not_blacklisted(self.env().caller())?;
-
-    if let Some(burn_address) = &self.lifecycle_state.burn_address {
-        if to == *burn_address {
-            self.assert_whitelisted(from)?;
-            return self.burn(from, id, amount);
-        }
-    }
 
     self.transfer_from(from, to, id, amount, data)
 }
@@ -208,14 +185,6 @@ pub struct Whitelisted {
     #[ink(topic)]
     account: AccountId,
 }
-
-#[ink(event)]
-pub struct BurnAddressUpdated {
-    #[ink(topic)]
-    old_address: Option<AccountId>,
-    #[ink(topic)]
-    new_address: AccountId,
-}
 ```
 
 ### Role Events
@@ -266,4 +235,6 @@ pub enum Error {
     AccountNotWhitelisted,
 }
 ```
+
+These enhancements provide a robust foundation for managing contract lifecycle, access control, and security features in the ERC1155 implementation. The code is now more secure, flexible, and maintainable, with proper event emission and error handling throughout.
  
