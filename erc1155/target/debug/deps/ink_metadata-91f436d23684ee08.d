@@ -1,0 +1,9 @@
+/Users/apple/Desktop/rust/erc1155/target/debug/deps/libink_metadata-91f436d23684ee08.rmeta: /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/lib.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/layout/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/layout/validate.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/specs.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/utils.rs
+
+/Users/apple/Desktop/rust/erc1155/target/debug/deps/ink_metadata-91f436d23684ee08.d: /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/lib.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/layout/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/layout/validate.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/specs.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/utils.rs
+
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/lib.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/layout/mod.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/layout/validate.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/specs.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ink_metadata-4.3.0/src/utils.rs:

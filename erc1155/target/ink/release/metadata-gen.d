@@ -1,0 +1,1 @@
+/Users/apple/Desktop/rust/erc1155/target/ink/release/metadata-gen: /Users/apple/Desktop/rust/erc1155/lib.rs /private/var/folders/gz/sqh2qz456339ryt70zk5hdkr0000gn/T/cargo-contract_PMitwg/.ink/metadata_gen/main.rs

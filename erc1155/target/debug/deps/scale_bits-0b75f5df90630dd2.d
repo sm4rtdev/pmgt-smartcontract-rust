@@ -1,0 +1,11 @@
+/Users/apple/Desktop/rust/erc1155/target/debug/deps/libscale_bits-0b75f5df90630dd2.rmeta: /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/lib.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/bits/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/bits/bits.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/decode_iter.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/encode_iter.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/format.rs
+
+/Users/apple/Desktop/rust/erc1155/target/debug/deps/scale_bits-0b75f5df90630dd2.d: /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/lib.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/bits/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/bits/bits.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/decode_iter.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/encode_iter.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/format.rs
+
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/lib.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/bits/mod.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/bits/bits.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/mod.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/decode_iter.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/encode_iter.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-bits-0.4.0/src/scale/format.rs:

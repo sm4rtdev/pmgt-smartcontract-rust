@@ -25,12 +25,23 @@ mod erc1155 {
         token_uris: Mapping<Id, String>,
         /// Lifecycle state
         lifecycle_state: LifecycleState,
+        /// Price threshold for triggering purchases (in wei)
+        price_threshold: Balance,
+        /// Contract owner
+        owner: AccountId,
     }
 
     /// Type for token IDs.
     pub type Id = u128;
     /// Type for token amounts.
     pub type Balance = u128;
+
+    /// Predefined IPFS URIs for NFTs
+    const THOR_HAMMER_URI: &str = "ipfs://QmZ8Syn28bEhZJnyYo2PEeNw5jmhS1RMa7YxaGgVQ3Qz84/thor_hammer.json";
+    const TROPHY_URI: &str = "ipfs://QmZ8Syn28bEhZJnyYo2PEeNw5jmhS1RMa7YxaGgVQ3Qz84/trophy.json";
+    const SWORD_URI: &str = "ipfs://QmZ8Syn28bEhZJnyYo2PEeNw5jmhS1RMa7YxaGgVQ3Qz84/sword.json";
+    const SHIELD_URI: &str = "ipfs://QmZ8Syn28bEhZJnyYo2PEeNw5jmhS1RMa7YxaGgVQ3Qz84/shield.json";
+    const COIN_URI: &str = "ipfs://QmZ8Syn28bEhZJnyYo2PEeNw5jmhS1RMa7YxaGgVQ3Qz84/coin.json";
 
     #[derive(Encode, Decode, Debug, PartialEq, Eq, Copy, Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -49,6 +60,8 @@ mod erc1155 {
         AccountBlacklisted,
         /// Account is not whitelisted
         AccountNotWhitelisted,
+        /// Insufficient payment value
+        InsufficientValue,
     }
 
     /// Event emitted when tokens are transferred.
@@ -126,6 +139,14 @@ mod erc1155 {
         account: AccountId,
     }
 
+    /// Event emitted when a price trigger is activated.
+    #[ink(event)]
+    pub struct Triggered {
+        #[ink(topic)]
+        sender: AccountId,
+        amount: Balance,
+    }
+
     /// Event emitted when a role is created.
     #[ink(event)]
     pub struct RoleCreated {
@@ -151,6 +172,16 @@ mod erc1155 {
         account: AccountId,
     }
 
+    /// Event emitted when fungible tokens are airdropped to NFT holders
+    #[ink(event)]
+    pub struct AirdropCompleted {
+        #[ink(topic)]
+        token_id: Id,
+        #[ink(topic)]
+        recipient: AccountId,
+        amount: Balance,
+    }
+
     #[derive(Encode, Decode, Debug, Clone)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct Role {
@@ -171,55 +202,63 @@ mod erc1155 {
         /// Creates a new ERC1155 contract.
         #[ink(constructor)]
         pub fn new() -> Self {
-            ink::utils::initialize_contract(|_| {})
+            let caller = Self::env().caller();
+            ink::utils::initialize_contract(|contract: &mut Self| {
+                contract.owner = caller;
+                contract.price_threshold = 1_000_000_000_000_000_000; // 1 ether in wei
+                contract._setup_initial_tokens();
+            })
         }
 
-        /// Returns the balance of `account` for token with `id`.
+        /// Sets up the initial NFTs with predefined metadata
+        fn _setup_initial_tokens(&mut self) {
+            // Create Thor's Hammer NFT
+            let hammer_id = self.create_token(String::from(THOR_HAMMER_URI));
+            
+            // Create Trophy NFT
+            let trophy_id = self.create_token(String::from(TROPHY_URI));
+            
+            // Create Sword NFT
+            let sword_id = self.create_token(String::from(SWORD_URI));
+            
+            // Create Shield NFT
+            let shield_id = self.create_token(String::from(SHIELD_URI));
+            
+            // Create Coin (fungible token)
+            let coin_id = self.create_token(String::from(COIN_URI));
+            
+            // Mint some tokens to the contract owner
+            let owner = self.owner;
+            let _ = self._mint(owner, hammer_id, 1);
+            let _ = self._mint(owner, trophy_id, 1);
+            let _ = self._mint(owner, sword_id, 1);
+            let _ = self._mint(owner, shield_id, 1);
+            let _ = self._mint(owner, coin_id, 1000);
+        }
+
+        /// Returns the balance of an account for a specific token.
         #[ink(message)]
         pub fn balance_of(&self, account: AccountId, id: Id) -> Balance {
             self.balances.get((id, account)).unwrap_or(0)
         }
 
-        /// Returns the balances of multiple accounts for multiple token ids.
+        /// Returns the balances of multiple accounts for multiple tokens.
         #[ink(message)]
         pub fn balance_of_batch(
             &self,
             accounts: Vec<AccountId>,
             ids: Vec<Id>,
-        ) -> Vec<Balance> {
-            let mut batch_balances = Vec::new();
-            let accounts_len = accounts.len();
-            
-            for i in 0..accounts_len {
-                let id = ids.get(i).copied().unwrap_or_default();
-                let account = accounts.get(i).cloned().unwrap_or_default();
-                batch_balances.push(self.balance_of(account, id));
+        ) -> Result<Vec<Balance>, Error> {
+            if accounts.len() != ids.len() {
+                return Err(Error::ArraySizeMismatch);
             }
-            
-            batch_balances
-        }
 
-        /// Sets or revokes approval for `operator` to transfer the caller's tokens.
-        #[ink(message)]
-        pub fn set_approval_for_all(
-            &mut self,
-            operator: AccountId,
-            approved: bool,
-        ) -> Result<(), Error> {
-            let caller = self.env().caller();
-            if caller == operator {
-                return Ok(());
+            let mut batch_balances = Vec::with_capacity(accounts.len());
+            for i in 0..accounts.len() {
+                batch_balances.push(self.balance_of(accounts[i], ids[i]));
             }
-            
-            self.approvals.insert((caller, operator), &approved);
-            
-            self.env().emit_event(ApprovalForAll {
-                owner: caller,
-                operator,
-                approved,
-            });
-            
-            Ok(())
+
+            Ok(batch_balances)
         }
 
         /// Returns whether `operator` is approved to transfer `owner`'s tokens.
@@ -228,7 +267,20 @@ mod erc1155 {
             self.approvals.get((owner, operator)).unwrap_or(false)
         }
 
-        /// Transfers `amount` of token `id` from `from` to `to`.
+        /// Grants or revokes permission to `operator` to transfer the caller's tokens.
+        #[ink(message)]
+        pub fn set_approval_for_all(&mut self, operator: AccountId, approved: bool) -> Result<(), Error> {
+            let caller = self.env().caller();
+            self.approvals.insert((caller, operator), &approved);
+            self.env().emit_event(ApprovalForAll {
+                owner: caller,
+                operator,
+                approved,
+            });
+            Ok(())
+        }
+
+        /// Transfers a single token.
         #[ink(message)]
         pub fn safe_transfer_from(
             &mut self,
@@ -246,7 +298,45 @@ mod erc1155 {
             self.transfer_from(from, to, id, amount, data)
         }
 
-        /// Transfers multiple tokens in a batch.
+        /// Internal implementation of token transfer.
+        fn transfer_from(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            id: Id,
+            amount: Balance,
+            data: Vec<u8>,
+        ) -> Result<(), Error> {
+            let caller = self.env().caller();
+            
+            if from != caller && !self.is_approved_for_all(from, caller) {
+                return Err(Error::NotApproved);
+            }
+            
+            let from_balance = self.balance_of(from, id);
+            if from_balance < amount {
+                return Err(Error::InsufficientBalance);
+            }
+            
+            self.balances.insert((id, from), &(from_balance - amount));
+            let to_balance = self.balance_of(to, id);
+            self.balances.insert((id, to), &(to_balance + amount));
+            
+            // Here would be receiver hook call if `to` is a contract
+            let _ = data; // Unused for now
+            
+            self.env().emit_event(TransferBatch {
+                operator: Some(caller),
+                from: Some(from),
+                to: Some(to),
+                ids: vec![id],
+                values: vec![amount],
+            });
+            
+            Ok(())
+        }
+
+        /// Transfers multiple tokens at once.
         #[ink(message)]
         pub fn safe_batch_transfer_from(
             &mut self,
@@ -256,20 +346,33 @@ mod erc1155 {
             amounts: Vec<Balance>,
             data: Vec<u8>,
         ) -> Result<(), Error> {
+            if ids.len() != amounts.len() {
+                return Err(Error::ArraySizeMismatch);
+            }
+
+            self.assert_not_paused()?;
+            self.assert_not_blacklisted(from)?;
+            self.assert_not_blacklisted(to)?;
+            self.assert_not_blacklisted(self.env().caller())?;
+
             let caller = self.env().caller();
             
             if from != caller && !self.is_approved_for_all(from, caller) {
                 return Err(Error::NotApproved);
             }
             
-            if ids.len() != amounts.len() {
-                return Err(Error::ArraySizeMismatch);
-            }
-            
             for i in 0..ids.len() {
-                let id = ids.get(i).copied().unwrap_or_default();
-                let amount = amounts.get(i).copied().unwrap_or_default();
-                self.perform_transfer(from, to, id, amount)?;
+                let id = ids[i];
+                let amount = amounts[i];
+                
+                let from_balance = self.balance_of(from, id);
+                if from_balance < amount {
+                    return Err(Error::InsufficientBalance);
+                }
+                
+                self.balances.insert((id, from), &(from_balance - amount));
+                let to_balance = self.balance_of(to, id);
+                self.balances.insert((id, to), &(to_balance + amount));
             }
             
             // Here would be receiver hook call if `to` is a contract
@@ -286,85 +389,42 @@ mod erc1155 {
             Ok(())
         }
 
-        /// Helper function to perform a single token transfer.
-        fn perform_transfer(
-            &mut self,
-            from: AccountId,
-            to: AccountId,
-            id: Id,
-            amount: Balance,
-        ) -> Result<(), Error> {
-            let from_balance = self.balance_of(from, id);
-            
-            if from_balance < amount {
-                return Err(Error::InsufficientBalance);
-            }
-            
-            // Decrease sender balance
-            self.balances.insert((id, from), &(from_balance - amount));
-            
-            // Increase receiver balance
-            let to_balance = self.balance_of(to, id);
-            self.balances.insert((id, to), &(to_balance + amount));
-            
-            Ok(())
-        }
-
-        /// Creates a new token type with an initial supply.
-        #[ink(message)]
-        pub fn create_token(
-            &mut self,
-            uri: String,
-            initial_supply: Balance,
-        ) -> Id {
-            let caller = self.env().caller();
-            let id = self.token_id_nonce;
-            
-            // Increment for next token
-            self.token_id_nonce += 1;
-            
-            // Set token URI
-            self.token_uris.insert(id, &uri);
-            
-            // Mint initial supply if requested
-            if initial_supply > 0 {
-                let current_balance = self.balance_of(caller, id);
-                self.balances.insert((id, caller), &(current_balance + initial_supply));
-            }
-            
-            // Emit event for new token creation
-            self.env().emit_event(TokenCreated {
-                id,
-                creator: caller,
-                uri: uri.clone(),
-            });
-            
-            id
-        }
-
         /// Returns the URI for a token.
         #[ink(message)]
         pub fn uri(&self, id: Id) -> String {
             self.token_uris.get(id).unwrap_or_default()
         }
 
-        /// Mints more of an existing token.
+        /// Creates a new token type.
         #[ink(message)]
-        pub fn mint(
-            &mut self,
-            to: AccountId,
-            id: Id,
-            amount: Balance,
-        ) -> Result<(), Error> {
-            let caller = self.env().caller();
+        pub fn create_token(&mut self, uri: String) -> Id {
+            let id = self.token_id_nonce;
+            self.token_id_nonce += 1;
+            self.token_uris.insert(id, &uri);
             
-            // You might want to add access control here
+            self.env().emit_event(TokenCreated {
+                id,
+                creator: self.env().caller(),
+                uri: uri.clone(),
+            });
             
+            id
+        }
+
+        /// Mints tokens to an account.
+        #[ink(message)]
+        pub fn mint(&mut self, to: AccountId, id: Id, amount: Balance) -> Result<(), Error> {
+            self.assert_owner()?;
+            self._mint(to, id, amount)
+        }
+
+        /// Internal mint implementation
+        fn _mint(&mut self, to: AccountId, id: Id, amount: Balance) -> Result<(), Error> {
             let to_balance = self.balance_of(to, id);
             self.balances.insert((id, to), &(to_balance + amount));
             
             self.env().emit_event(TransferBatch {
-                operator: Some(caller),
+                operator: Some(self.env().caller()),
                 from: None,
                 to: Some(to),
                 ids: vec![id],
@@ -513,6 +573,77 @@ mod erc1155 {
             }
         }
 
+        /// Price trigger functionality - buy action
+        #[ink(message, payable)]
+        pub fn buy(&mut self) -> Result<(), Error> {
+            let caller = self.env().caller();
+            let payment = self.env().transferred_value();
+            
+            // Check if payment meets the threshold
+            if payment < self.price_threshold {
+                return Err(Error::InsufficientValue);
+            }
+            
+            // Emit the Triggered event
+            self.env().emit_event(Triggered {
+                sender: caller,
+                amount: payment,
+            });
+            
+            // Automatically mint NFT to the buyer (using token_id 1 as example)
+            let token_id = 1; // This could be parameterized or changed based on needs
+            self._mint(caller, token_id, 1)?;
+            
+            Ok(())
+        }
+        
+        /// Set a new price threshold for the buy trigger
+        #[ink(message)]
+        pub fn set_threshold(&mut self, new_threshold: Balance) -> Result<(), Error> {
+            self.assert_owner()?;
+            self.price_threshold = new_threshold;
+            Ok(())
+        }
+        
+        /// Get the current price threshold
+        #[ink(message)]
+        pub fn get_threshold(&self) -> Balance {
+            self.price_threshold
+        }
+
+        /// Airdrops fungible tokens to NFT holders
+        #[ink(message)]
+        pub fn airdrop_to_nft_holders(&mut self, nft_id: Id, fungible_id: Id, amount: Balance) -> Result<(), Error> {
+            self.assert_owner()?;
+            
+            // Define the maximum number of accounts to check
+            // (in a real implementation you might need pagination or limits)
+            let max_accounts = 1000;
+            let mut count = 0;
+            
+            // This is a simplistic approach to find NFT holders
+            // In a production contract, you might need a more efficient approach
+            for account_id in self.env().account_id().as_ref().iter().take(max_accounts) {
+                let account = AccountId::from(*account_id);
+                let balance = self.balance_of(account, nft_id);
+                
+                // If account holds the NFT, airdrop fungible tokens
+                if balance > 0 {
+                    self._mint(account, fungible_id, amount)?;
+                    
+                    self.env().emit_event(AirdropCompleted {
+                        token_id: fungible_id,
+                        recipient: account,
+                        amount,
+                    });
+                    
+                    count += 1;
+                }
+            }
+            
+            Ok(())
+        }
+
         // Helper methods for assertions
         fn assert_not_paused(&self) -> Result<(), Error> {
             if self.lifecycle_state.paused {
@@ -536,7 +667,7 @@ mod erc1155 {
         }
 
         fn assert_owner(&self) -> Result<(), Error> {
-            if self.env().caller() != self.env().account_id() {
+            if self.env().caller() != self.owner {
                 return Err(Error::NotOwner);
             }
             Ok(())
@@ -546,70 +677,122 @@ mod erc1155 {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use ink::env::test;
+        use ink::env::test::*;
 
-        #[ink::test]
-        fn create_token_works() {
-            let mut contract = Erc1155::new();
-            let accounts = test::default_accounts::<ink::env::DefaultEnvironment>();
-            
-            // Create a new token
-            let token_id = contract.create_token(String::from("ipfs://metadata"), 100);
-            
-            // Check the balance
-            assert_eq!(contract.balance_of(accounts.alice, token_id), 100);
-            
-            // Check the URI
-            assert_eq!(contract.uri(token_id), String::from("ipfs://metadata"));
+        fn default_accounts() -> ink::env::test::DefaultAccounts<ink::env::DefaultEnvironment> {
+            ink::env::test::default_accounts::<ink::env::DefaultEnvironment>()
+        }
+
+        fn set_caller(caller: AccountId) {
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(caller);
         }
 
         #[ink::test]
-        fn transfers_work() {
-            let mut contract = Erc1155::new();
-            let accounts = test::default_accounts::<ink::env::DefaultEnvironment>();
+        fn create_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.alice);
             
-            // Create a new token
-            let token_id = contract.create_token(String::from("ipfs://metadata"), 100);
+            let erc1155 = Erc1155::new();
+            assert_eq!(erc1155.owner, accounts.alice);
+        }
+
+        #[ink::test]
+        fn minting_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.alice);
             
-            // Transfer tokens
-            let result = contract.safe_transfer_from(
+            let mut erc1155 = Erc1155::new();
+            
+            // Create a token
+            let token_id = erc1155.create_token(String::from("test_uri"));
+            
+            // Mint some tokens
+            assert!(erc1155.mint(accounts.bob, token_id, 100).is_ok());
+            
+            // Check balance
+            assert_eq!(erc1155.balance_of(accounts.bob, token_id), 100);
+        }
+
+        #[ink::test]
+        fn transfer_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.alice);
+            
+            let mut erc1155 = Erc1155::new();
+            
+            // Create a token
+            let token_id = erc1155.create_token(String::from("test_uri"));
+            
+            // Mint some tokens to Alice
+            assert!(erc1155.mint(accounts.alice, token_id, 100).is_ok());
+            
+            // Transfer from Alice to Bob
+            assert!(erc1155.safe_transfer_from(
                 accounts.alice,
                 accounts.bob,
                 token_id,
                 50,
-                Vec::new(),
-            );
+                Vec::new()
+            ).is_ok());
             
-            assert!(result.is_ok());
-            assert_eq!(contract.balance_of(accounts.alice, token_id), 50);
-            assert_eq!(contract.balance_of(accounts.bob, token_id), 50);
+            // Check balances
+            assert_eq!(erc1155.balance_of(accounts.alice, token_id), 50);
+            assert_eq!(erc1155.balance_of(accounts.bob, token_id), 50);
         }
 
         #[ink::test]
-        fn approvals_work() {
-            let mut contract = Erc1155::new();
-            let accounts = test::default_accounts::<ink::env::DefaultEnvironment>();
+        fn approval_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.alice);
             
-            // Create a new token
-            let token_id = contract.create_token(String::from("ipfs://metadata"), 100);
+            let mut erc1155 = Erc1155::new();
             
-            // Set approval
-            let _ = contract.set_approval_for_all(accounts.bob, true);
+            // Create a token
+            let token_id = erc1155.create_token(String::from("test_uri"));
             
-            // Bob should now be able to transfer Alice's tokens
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(accounts.bob);
+            // Mint some tokens to Alice
+            assert!(erc1155.mint(accounts.alice, token_id, 100).is_ok());
             
-            let result = contract.safe_transfer_from(
+            // Approve Charlie to spend Alice's tokens
+            assert!(erc1155.set_approval_for_all(accounts.charlie, true).is_ok());
+            
+            // Check approval
+            assert!(erc1155.is_approved_for_all(accounts.alice, accounts.charlie));
+            
+            // Let Charlie transfer from Alice to Bob
+            set_caller(accounts.charlie);
+            assert!(erc1155.safe_transfer_from(
                 accounts.alice,
-                accounts.eve,
+                accounts.bob,
                 token_id,
                 30,
-                Vec::new(),
-            );
+                Vec::new()
+            ).is_ok());
             
-            assert!(result.is_ok());
-            assert_eq!(contract.balance_of(accounts.alice, token_id), 70);
-            assert_eq!(contract.balance_of(accounts.eve, token_id), 30);
+            // Check balances
+            assert_eq!(erc1155.balance_of(accounts.alice, token_id), 70);
+            assert_eq!(erc1155.balance_of(accounts.bob, token_id), 30);
+        }
+
+        #[ink::test]
+        fn buy_trigger_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.alice);
+            
+            let mut erc1155 = Erc1155::new();
+            
+            // Set payment value to 1 ether (in the test environment)
+            let payment = 1_000_000_000_000_000_000;
+            ink::env::test::set_value_transferred::<ink::env::DefaultEnvironment>(payment);
+            
+            // Buy should succeed with sufficient payment
+            assert!(erc1155.buy().is_ok());
+            
+            // Set insufficient payment
+            ink::env::test::set_value_transferred::<ink::env::DefaultEnvironment>(payment / 2);
+            
+            // Buy should fail with insufficient payment
+            assert!(matches!(erc1155.buy(), Err(Error::InsufficientValue)));
         }
     }
 } 

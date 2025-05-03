@@ -1,0 +1,10 @@
+/Users/apple/Desktop/rust/erc1155/target/debug/deps/libscale_encode-5d957a1d06e19e38.rmeta: /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/lib.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/composite.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/variant.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/error/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/error/context.rs
+
+/Users/apple/Desktop/rust/erc1155/target/debug/deps/scale_encode-5d957a1d06e19e38.d: /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/lib.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/composite.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/variant.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/error/mod.rs /Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/error/context.rs
+
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/lib.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/mod.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/composite.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/impls/variant.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/error/mod.rs:
+/Users/apple/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/scale-encode-0.5.0/src/error/context.rs:
